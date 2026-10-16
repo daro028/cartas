@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generador de PDFs Personalizados - Diplomas y Cartas</title>
+  
+  <!-- Fuentes de Google elegantes para diplomas, certificados y cartas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Bebas+Neue&family=Caveat:wght@600;700&family=Cinzel:wght@500;700;900&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Dancing+Script:wght@600;700&family=EB+Garamond:ital,wght@0,500;0,700;1,500&family=Great+Vibes&family=Italianno&family=Lora:ital,wght@0,500;0,700;1,500&family=Marck+Script&family=Montserrat:wght@400;600;700&family=Pacifico&family=Parisienne&family=Pinyon+Script&family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=Poppins:wght@400;600;700&family=Prata&family=Roboto:wght@400;500;700&family=Sacramento&family=Satisfy&family=Tangerine:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Librerías: SheetJS (Excel), jsPDF (PDFs) y JSZip (Empaquetar individuales) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  
+  <!-- Imagen inicial por defecto (1.png) pre-cargada sin problemas de CORS local -->
+  <script src="default_image.js"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #059669;
+      --success-hover: #047857;
+      --bg: #0f172a;
+      --panel-bg: #1e293b;
+      --panel-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: #0f172a;
+      --accent: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Barra Superior */
+    header {
+      background-color: var(--panel-bg);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .header-badge {
+      font-size: 0.75rem;
+      background: rgba(37, 99, 235, 0.2);
+      color: #60a5fa;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Layout Principal Dividido */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 61px);
+      overflow: hidden;
+    }
+
+    /* Panel Lateral de Controles */
+    aside.sidebar {
+      width: 440px;
+      background-color: var(--panel-bg);
+      border-right: 1px solid var(--panel-border);
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Secciones del panel */
+    .section-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-card.highlight {
+      border-color: #3b82f6;
+      background: rgba(37, 99, 235, 0.05);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-number {
+      width: 22px;
+      height: 22px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* Campos y Formularios */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .form-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .form-row-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      background: var(--input-bg);
+      border: 1px solid var(--panel-border);
+      color: white;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+    .btn-success:hover { background: var(--success-hover); }
+
+    .btn-secondary {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+    }
+    .btn-secondary:hover { background: #475569; }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px dashed #64748b;
+      color: #94a3b8;
+    }
+    .btn-outline:hover {
+      border-color: #94a3b8;
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 5px 9px;
+      font-size: 0.78rem;
+    }
+
+    .btn-full { width: 100%; }
+
+    /* File drop zone compacta */
+    .drop-compact {
+      position: relative;
+      border: 1.5px dashed var(--panel-border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(15, 23, 42, 0.4);
+      transition: all 0.2s;
+    }
+    .drop-compact:hover {
+      border-color: var(--primary);
+      background: rgba(37, 99, 235, 0.05);
+    }
+    .drop-compact input[type="file"] {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* Controles de Color RGB */
+    .rgb-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--input-bg);
+      border: 1px solid var(--panel-border);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+    .color-swatch-picker {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: transparent;
+      padding: 0;
+    }
+    .rgb-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      flex: 1;
+    }
+    .rgb-mini-field {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .rgb-mini-field span {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .rgb-mini-field input {
+      padding: 5px 6px;
+      text-align: center;
+    }
+
+    /* Grupo de Botones de Alineación y Estilos */
+    .btn-group {
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+    }
+    .btn-group button {
+      flex: 1;
+      padding: 7px;
+      background: var(--input-bg);
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    .btn-group button.active {
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+    }
+
+    /* Área Central de Vista Previa / Canvas */
+    main.preview-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #020617;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview-toolbar {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+
+    .student-navigator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .student-badge {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .student-badge strong {
+      color: #38bdf8;
+    }
+
+    .canvas-viewport {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      padding: 50px 40px;
+      position: relative;
+      user-select: none;
+    }
+
+    /* Contenedor del Canvas y del Recuadro Arrastrable */
+    .stage-wrapper {
+      margin: auto;
+      position: relative;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      border-radius: 4px;
+      background: #fff;
+      transform-origin: center center;
+      flex-shrink: 0;
+    }
+
+    #previewCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Recuadro Interactivo para el Nombre */
+    .text-box-overlay {
+      position: absolute;
+      border: 2px dashed #3b82f6;
+      background: rgba(59, 130, 246, 0.12);
+      cursor: move;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      z-index: 10;
+      transform-origin: center center;
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+
+    .text-box-overlay:hover, .text-box-overlay.dragging {
+      border-color: #60a5fa;
+      background: rgba(59, 130, 246, 0.22);
+    }
+
+    /* Handle de Rotación */
+    .rotate-stem {
+      position: absolute;
+      top: -24px;
+      left: 50%;
+      width: 2px;
+      height: 24px;
+      background: #38bdf8;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .rotate-handle {
+      position: absolute;
+      top: -34px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: #38bdf8;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: grab;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      z-index: 25;
+      transition: transform 0.1s ease;
+    }
+    .rotate-handle:hover, .rotate-handle.rotating {
+      background: #0284c7;
+      cursor: grabbing;
+      transform: translateX(-50%) scale(1.2);
+    }
+
+    /* Puntos de redimensión (Handles) */
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #3b82f6;
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .resize-handle.tl { top: -6px; left: -6px; cursor: nwse-resize; }
+    .resize-handle.tr { top: -6px; right: -6px; cursor: nesw-resize; }
+    .resize-handle.bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .resize-handle.br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    .resize-handle.ml { top: calc(50% - 5px); left: -6px; cursor: ew-resize; }
+    .resize-handle.mr { top: calc(50% - 5px); right: -6px; cursor: ew-resize; }
+
+    /* Indicador flotante de coordenadas */
+    .box-badge {
+      position: absolute;
+      top: -24px;
+      left: 0;
+      background: #1e293b;
+      color: #93c5fd;
+      border: 1px solid #3b82f6;
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      font-family: monospace;
+    }
+
+    /* Modal de Progreso */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 440px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: #334155;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 16px 0 10px;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2563eb, #38bdf8);
+      transition: width 0.1s ease;
+    }
+
+    /* Scrollbars elegantes */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header>
+    <div class="header-title">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <h1>Generador de PDFs Personalizados</h1>
+      <span class="header-badge">Diplomas &amp; Cartas</span>
+    </div>
+
+    <div class="header-actions">
+      <button id="btnQuickHelp" class="btn btn-secondary btn-sm" onclick="showHelp()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Ayuda rápida
+      </button>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <div class="app-container">
+    
+    <!-- Panel Lateral de Configuración -->
+    <aside class="sidebar">
+
+      <!-- 1. Plantilla de Fondo -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="step-number">1</span>
+            Imagen de Fondo
+          </div>
+          <span id="imgDimensionsBadge" style="font-size: 0.72rem; color: var(--text-muted);">1414 × 2000 px</span>
+        </div>
+
+        <div class="drop-compact">
+          <input type="file" id="bgFileInput" accept="image/png, image/jpeg, image/webp">
+          <div style="font-size: 0.8rem; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <span id="bgImageName">Usando 1.png (Predeterminada)</span>
+          </div>
+          <div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">Clic para cambiar por otra imagen</div>
+        </div>
+      </div>
+
+      <!-- 2. Alumnos y Excel -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="step-number">2</span>
+            Alumnos (Excel / Lista)
+          </div>
+          <span id="studentCountBadge" class="header-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(52, 211, 153, 0.3);">
+            10 alumnos
+          </span>
+        </div>
+
+        <div class="drop-compact">
+          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv">
+          <div style="font-size: 0.8rem; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+            <span id="excelFileName">Cargar archivo Excel (.xlsx / .csv)</span>
+          </div>
+          <div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">O usá la lista de ejemplo cargada</div>
+        </div>
+
+        <div id="columnSelectWrapper" class="form-group" style="display: none;">
+          <label>Columna con los nombres:</label>
+          <select id="columnSelect"></select>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label>Editar nombres manualmente (uno por línea):</label>
+            <button id="btnToggleManualList" class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 0.7rem;">Ver lista</button>
+          </div>
+          <textarea id="manualStudentList" rows="4" style="display: none; resize: vertical;" placeholder="Un nombre por renglón..."></textarea>
+        </div>
+      </div>
+
+      <!-- 3. Posición y Tamaño del Recuadro -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="step-number">3</span>
+            Recuadro del Nombre
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnCenterHoriz" title="Centrar horizontalmente en la hoja">
+            Centrar X
+          </button>
+        </div>
+
+        <!-- Indicador de hoja activa y acción de copiar a todos -->
+        <div style="background: rgba(37, 99, 235, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="font-size: 0.74rem; color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span>📍 Hoja actual:</span> <strong id="currentStudentBoxLabel" style="color: white;">#1 Agustina Morales</strong>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnCopyBoxToAll" style="padding: 2px 7px; font-size: 0.68rem; white-space: nowrap;" title="Copiar esta posición y rotación a todas las demás hojas">
+            Copiar a todas
+          </button>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Posición X (px)</label>
+            <input type="number" id="inputX" min="0" step="5">
+          </div>
+          <div class="form-group">
+            <label>Posición Y (px)</label>
+            <input type="number" id="inputY" min="0" step="5">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ancho (px)</label>
+            <input type="number" id="inputW" min="50" step="10">
+          </div>
+          <div class="form-group">
+            <label>Alto (px)</label>
+            <input type="number" id="inputH" min="30" step="5">
+          </div>
+        </div>
+
+        <!-- Control de Rotación -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <label>Rotación: <span id="rotationDisplay" style="color: #38bdf8; font-weight: 700;">0°</span></label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRotate0" style="padding: 2px 7px; font-size: 0.7rem;" title="Horizontal">0°</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRotate90" style="padding: 2px 7px; font-size: 0.7rem;" title="Vertical derecha">90°</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRotateNeg90" style="padding: 2px 7px; font-size: 0.7rem;" title="Vertical izquierda">-90°</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRotate180" style="padding: 2px 7px; font-size: 0.7rem;" title="Invertido">180°</button>
+            </div>
+          </div>
+          <div class="form-row" style="grid-template-columns: 1fr 90px; gap: 8px; align-items: center;">
+            <input type="range" id="rotationSlider" min="-180" max="180" value="0" step="1">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <input type="number" id="inputRotation" min="-180" max="180" value="0" step="1" style="text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--text-muted);">°</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size: 0.72rem; color: #64748b;">
+          💡 <em>Tip: Podés rotar con el círculo superior azul de la etiqueta o usando los botones y el control deslizante.</em>
+        </div>
+      </div>
+
+      <!-- 4. Tipografía, Tamaño y Color (RGB) -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="step-number">4</span>
+            Fuente y Color
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tipo de Letra:</label>
+          <select id="fontFamilySelect">
+            <optgroup label="Caligráficas / Cursivas (Diplomas y Cartas)">
+              <option value="Great Vibes" selected>Great Vibes (Diplomas elegantes)</option>
+              <option value="Alex Brush">Alex Brush (Firma fluida)</option>
+              <option value="Allura">Allura (Elegante y estilizada)</option>
+              <option value="Dancing Script">Dancing Script (Moderna informal)</option>
+              <option value="Parisienne">Parisienne (Clásica refinada)</option>
+              <option value="Pinyon Script">Pinyon Script (Lujosa y formal)</option>
+              <option value="Sacramento">Sacramento (Monolínea delicada)</option>
+              <option value="Marck Script">Marck Script (Manuscrita clara)</option>
+              <option value="Satisfy">Satisfy (Pincel dinámico)</option>
+              <option value="Italianno">Italianno (Cursiva itálica)</option>
+              <option value="Tangerine">Tangerine (Caligráfica alta)</option>
+              <option value="Caveat">Caveat (Manuscrita natural)</option>
+              <option value="Pacifico">Pacifico (Retro destacada)</option>
+            </optgroup>
+            <optgroup label="Serif Formal / Tradicional">
+              <option value="Cinzel">Cinzel (Institucional romano)</option>
+              <option value="Cinzel Decorative">Cinzel Decorative (Ornada)</option>
+              <option value="Playfair Display">Playfair Display (Elegante)</option>
+              <option value="Cormorant Garamond">Cormorant Garamond (Académica)</option>
+              <option value="EB Garamond">EB Garamond (Clásica tipográfica)</option>
+              <option value="Lora">Lora (Editorial refinada)</option>
+              <option value="Prata">Prata (Moda y elegancia)</option>
+              <option value="Georgia">Georgia (Sistema)</option>
+              <option value="Times New Roman">Times New Roman (Sistema)</option>
+            </optgroup>
+            <optgroup label="Sans-Serif Moderna y Títulos">
+              <option value="Montserrat">Montserrat (Limpia y moderna)</option>
+              <option value="Poppins">Poppins (Geométrica)</option>
+              <option value="Bebas Neue">Bebas Neue (Impacto / Mayúsculas)</option>
+              <option value="Roboto">Roboto (Moderna)</option>
+              <option value="Arial">Arial (Sistema)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Buscador / Cargador de cualquier fuente de Google Fonts -->
+        <div class="form-group" style="background: rgba(15, 23, 42, 0.45); border: 1px dashed #3b82f6; border-radius: 8px; padding: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="color: #93c5fd; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+              <span>🌐 Usar cualquier Google Font</span>
+            </label>
+            <a href="https://fonts.google.com" target="_blank" style="font-size: 0.72rem; color: #60a5fa; text-decoration: underline;" title="Abrir catálogo de Google Fonts">
+              Explorar fuentes ↗
+            </a>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="googleFontInput" placeholder="Escribí el nombre (ej: Tangerine, Caveat, Allura...)" style="flex: 1; font-size: 0.8rem;">
+            <button type="button" class="btn btn-primary btn-sm" id="btnLoadGoogleFont" style="white-space: nowrap;">Cargar</button>
+          </div>
+          <div id="googleFontStatus" style="font-size: 0.72rem; margin-top: 4px; min-height: 14px;"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tamaño Fuente: <span id="fontSizeDisplay" style="color:#60a5fa; font-weight:700;">64 px</span></label>
+            <input type="range" id="fontSizeSlider" min="20" max="180" value="64">
+          </div>
+          <div class="form-group">
+            <label>Valor exacto (px)</label>
+            <input type="number" id="fontSizeNumber" min="10" max="300" value="64">
+          </div>
+        </div>
+
+        <!-- Color RGB -->
+        <div class="form-group">
+          <label>Color del Texto (RGB y Selector):</label>
+          <div class="rgb-box">
+            <input type="color" id="colorPicker" class="color-swatch-picker" value="#1a202c">
+            <div class="rgb-inputs">
+              <div class="rgb-mini-field">
+                <span>R</span>
+                <input type="number" id="rgbR" min="0" max="255" value="26">
+              </div>
+              <div class="rgb-mini-field">
+                <span>G</span>
+                <input type="number" id="rgbG" min="0" max="255" value="32">
+              </div>
+              <div class="rgb-mini-field">
+                <span>B</span>
+                <input type="number" id="rgbB" min="0" max="255" value="44">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grosor de la Fuente (Font Weight) -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <label>Grosor / Peso: <span id="fontWeightDisplay" style="color: #60a5fa; font-weight: 700;">Normal (400)</span></label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" class="btn btn-secondary btn-sm" data-weight="300" style="padding: 2px 6px; font-size: 0.7rem;">Fina</button>
+              <button type="button" class="btn btn-secondary btn-sm active" data-weight="400" style="padding: 2px 6px; font-size: 0.7rem;">Normal</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-weight="600" style="padding: 2px 6px; font-size: 0.7rem;">Media</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-weight="700" style="padding: 2px 6px; font-size: 0.7rem;">Negrita</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-weight="900" style="padding: 2px 6px; font-size: 0.7rem;">Black</button>
+            </div>
+          </div>
+          <select id="fontWeightSelect">
+            <option value="100">100 - Extra fina (Thin)</option>
+            <option value="200">200 - Fina ligera (Extra Light)</option>
+            <option value="300">300 - Fina (Light)</option>
+            <option value="400" selected>400 - Normal (Regular)</option>
+            <option value="500">500 - Media (Medium)</option>
+            <option value="600">600 - Semi Negrita (Semi Bold)</option>
+            <option value="700">700 - Negrita (Bold)</option>
+            <option value="800">800 - Extra Negrita (Extra Bold)</option>
+            <option value="900">900 - Negra (Black / Heavy)</option>
+          </select>
+        </div>
+
+        <!-- Alineación y Estilos -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Alineación:</label>
+            <div class="btn-group" id="alignGroup">
+              <button type="button" data-align="left" title="Alinear a la izquierda">Izq</button>
+              <button type="button" data-align="center" class="active" title="Centrado">Centro</button>
+              <button type="button" data-align="right" title="Alinear a la derecha">Der</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Estilo:</label>
+            <div class="btn-group">
+              <button type="button" id="btnItalic" title="Activar / Desactivar Cursiva (Itálica)"><i>I</i> Cursiva</button>
+              <button type="button" id="btnUppercase" title="TODO MAYÚSCULAS">MAY</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="chkAutoFit" checked>
+            <span>Reducir tamaño automáticamente si el nombre excede el ancho</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 5. Descargas -->
+      <div class="section-card highlight">
+        <div class="section-title" style="color: #60a5fa;">
+          <span class="step-number" style="background:#2563eb;">5</span>
+          Descargar Documentos
+        </div>
+
+        <button id="btnDownloadAllPDF" class="btn btn-primary btn-full" style="padding: 12px; font-size: 0.95rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Descargar PDF Grupal (1 Archivo Completo)
+        </button>
+
+        <div class="form-row">
+          <button id="btnDownloadZip" class="btn btn-secondary btn-sm" style="flex:1;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            PDFs Individuales (.ZIP)
+          </button>
+          <button id="btnDownloadCurrentPDF" class="btn btn-secondary btn-sm" style="flex:1;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+            Solo Alumno Actual
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Área de Vista Previa Central -->
+    <main class="preview-area">
+
+      <!-- Barra de Navegación de Alumnos y Zoom -->
+      <div class="preview-toolbar">
+        <div class="student-navigator">
+          <button id="btnPrevStudent" class="btn btn-secondary btn-sm" title="Hoja anterior (Flecha Izquierda)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            Anterior
+          </button>
+
+          <select id="studentSelectDropdown" style="background: #1e293b; color: #38bdf8; font-weight: 600; border: 1px solid #334155; padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; outline: none; cursor: pointer; max-width: 260px;">
+          </select>
+
+          <!-- Compatibilidad con elementos de texto -->
+          <span id="studentIndexLabel" style="display: none;"></span>
+          <strong id="currentStudentName" style="display: none;"></strong>
+
+          <button id="btnNextStudent" class="btn btn-secondary btn-sm" title="Hoja siguiente (Flecha Derecha)">
+            Siguiente
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Zoom:</span>
+          <button id="btnZoomOut" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">−</button>
+          <span id="zoomLevelText" style="font-size: 0.78rem; font-weight:600; min-width: 42px; text-align: center;">40%</span>
+          <button id="btnZoomIn" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">+</button>
+          <button id="btnZoomFit" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 4px 8px;">Ajustar</button>
+        </div>
+      </div>
+
+      <!-- Vista del Canvas -->
+      <div class="canvas-viewport" id="viewport">
+        <div class="stage-wrapper" id="stageWrapper">
+          <canvas id="previewCanvas"></canvas>
+          
+          <!-- Recuadro Interactivo para el texto -->
+          <div id="textBoxOverlay" class="text-box-overlay">
+            <div id="boxCoordsBadge" class="box-badge">X: 150 | Y: 1100</div>
+            <div class="rotate-stem"></div>
+            <div class="rotate-handle" id="rotateHandle" title="Arrastrar para girar la etiqueta"></div>
+            <div class="resize-handle tl" data-handle="tl"></div>
+            <div class="resize-handle tr" data-handle="tr"></div>
+            <div class="resize-handle bl" data-handle="bl"></div>
+            <div class="resize-handle br" data-handle="br"></div>
+            <div class="resize-handle ml" data-handle="ml"></div>
+            <div class="resize-handle mr" data-handle="mr"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Modal de Progreso de Generación -->
+  <div id="progressModal" class="modal-backdrop">
+    <div class="modal-content">
+      <h3 id="progressTitle" style="margin-bottom: 8px; font-size: 1.1rem; color: white;">Generando PDF...</h3>
+      <p id="progressStatus" style="font-size: 0.85rem; color: var(--text-muted);">Procesando página 1 de 10...</p>
+      
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      
+      <div id="progressPercent" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">10%</div>
+      <div style="font-size: 0.72rem; color: #64748b; margin-top: 10px;">Por favor espere mientras se compilan las páginas en alta resolución.</div>
+    </div>
+  </div>
+
+  <script>
+    // --- ESTADO DE LA APLICACIÓN ---
+    const state = {
+      image: new Image(),
+      imageLoaded: false,
+      imageWidth: 1414,
+      imageHeight: 2000,
+      
+      // Lista de Alumnos
+      students: [
+        "Agustina Morales",
+        "Benjamín Fernández",
+        "Camila Rodríguez",
+        "Diego Alejandro Rossi",
+        "Florencia Valentina Gómez",
+        "Ignacio Martínez",
+        "Lucía Belén Domínguez",
+        "Mateo Gabriel Giménez",
+        "Sofía Mailén Romero",
+        "Valentín Soria"
+      ],
+      currentStudentIndex: 0,
+      
+      // Posición por defecto y almacenamiento de posición individual por alumno
+      defaultBox: {
+        x: 150,
+        y: 1080,
+        width: 1114,
+        height: 120,
+        rotation: 0
+      },
+      studentBoxes: {},
+      
+      // Tipografía y formato
+      style: {
+        fontFamily: 'Great Vibes',
+        fontSize: 78,
+        fontWeight: '400',
+        color: { r: 26, g: 32, b: 44 }, // Formato RGB pedido
+        align: 'center', // left | center | right
+        isBold: false,
+        isItalic: false,
+        isUppercase: false,
+        autoFit: true
+      },
+      
+      // Zoom de la vista previa
+      scale: 0.35
+    };
+
+    // Funciones de acceso a la posición individual de cada hoja
+    function getStudentBox(index) {
+      if (!state.studentBoxes) state.studentBoxes = {};
+      if (!state.studentBoxes[index]) {
+        state.studentBoxes[index] = { ...state.defaultBox };
+      }
+      return state.studentBoxes[index];
+    }
+
+    function getCurrentBox() {
+      return getStudentBox(state.currentStudentIndex);
+    }
+
+    // state.box apunta y modifica de forma transparente la caja del alumno actualmente seleccionado
+    Object.defineProperty(state, 'box', {
+      get() {
+        return getCurrentBox();
+      },
+      set(val) {
+        state.studentBoxes[state.currentStudentIndex] = { ...val };
+      }
+    });
+
+    // --- ELEMENTOS DEL DOM ---
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    const stageWrapper = document.getElementById('stageWrapper');
+    const overlay = document.getElementById('textBoxOverlay');
+    const boxBadge = document.getElementById('boxCoordsBadge');
+    const viewport = document.getElementById('viewport');
+    const studentSelectDropdown = document.getElementById('studentSelectDropdown');
+    const btnCopyBoxToAll = document.getElementById('btnCopyBoxToAll');
+    const currentStudentBoxLabel = document.getElementById('currentStudentBoxLabel');
+
+    // Inputs de posición y rotación
+    const inputX = document.getElementById('inputX');
+    const inputY = document.getElementById('inputY');
+    const inputW = document.getElementById('inputW');
+    const inputH = document.getElementById('inputH');
+    const rotationSlider = document.getElementById('rotationSlider');
+    const inputRotation = document.getElementById('inputRotation');
+    const rotationDisplay = document.getElementById('rotationDisplay');
+    const rotateHandle = document.getElementById('rotateHandle');
+
+    // Inputs de Estilo y Color
+    const fontFamilySelect = document.getElementById('fontFamilySelect');
+    const fontSizeSlider = document.getElementById('fontSizeSlider');
+    const fontSizeNumber = document.getElementById('fontSizeNumber');
+    const fontSizeDisplay = document.getElementById('fontSizeDisplay');
+    const fontWeightSelect = document.getElementById('fontWeightSelect');
+    const fontWeightDisplay = document.getElementById('fontWeightDisplay');
+    const fontWeightButtons = document.querySelectorAll('[data-weight]');
+    const colorPicker = document.getElementById('colorPicker');
+    const rgbR = document.getElementById('rgbR');
+    const rgbG = document.getElementById('rgbG');
+    const rgbB = document.getElementById('rgbB');
+    const alignButtons = document.querySelectorAll('#alignGroup button');
+    const btnItalic = document.getElementById('btnItalic');
+    const btnUppercase = document.getElementById('btnUppercase');
+    const chkAutoFit = document.getElementById('chkAutoFit');
+
+    // Alumnos & Archivos
+    const bgFileInput = document.getElementById('bgFileInput');
+    const bgImageName = document.getElementById('bgImageName');
+    const imgDimensionsBadge = document.getElementById('imgDimensionsBadge');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const excelFileName = document.getElementById('excelFileName');
+    const columnSelectWrapper = document.getElementById('columnSelectWrapper');
+    const columnSelect = document.getElementById('columnSelect');
+    const studentCountBadge = document.getElementById('studentCountBadge');
+    const manualStudentList = document.getElementById('manualStudentList');
+    const btnToggleManualList = document.getElementById('btnToggleManualList');
+
+    // Navegación
+    const btnPrevStudent = document.getElementById('btnPrevStudent');
+    const btnNextStudent = document.getElementById('btnNextStudent');
+    const studentIndexLabel = document.getElementById('studentIndexLabel');
+    const currentStudentName = document.getElementById('currentStudentName');
+
+    // Botones de Descarga
+    const btnDownloadAllPDF = document.getElementById('btnDownloadAllPDF');
+    const btnDownloadZip = document.getElementById('btnDownloadZip');
+    const btnDownloadCurrentPDF = document.getElementById('btnDownloadCurrentPDF');
+
+    // Modal
+    const progressModal = document.getElementById('progressModal');
+    const progressTitle = document.getElementById('progressTitle');
+    const progressStatus = document.getElementById('progressStatus');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+
+    // --- INICIALIZACIÓN ---
+    window.addEventListener('DOMContentLoaded', async () => {
+      syncInputsFromState();
+      updateManualListTextarea();
+      
+      // Cargar imagen inicial (1.png pre-codificada en default_image.js para evitar problemas de CORS local)
+      if (typeof DEFAULT_IMAGE_BASE64 !== 'undefined') {
+        loadImage(DEFAULT_IMAGE_BASE64, '1.png');
+      } else {
+        // Fallback relativo si se abre con servidor
+        loadImage('1.png', '1.png');
+      }
+
+      setupEventListeners();
+      
+      // Auto-ajustar zoom después de cargar
+      setTimeout(autoFitZoom, 300);
+    });
+
+    // --- CARGA DE IMÁGENES ---
+    function loadImage(src, filename = 'Imagen') {
+      state.image = new Image();
+      state.image.onload = () => {
+        state.imageLoaded = true;
+        state.imageWidth = state.image.naturalWidth || state.image.width;
+        state.imageHeight = state.image.naturalHeight || state.image.height;
+        
+        bgImageName.textContent = filename;
+        imgDimensionsBadge.textContent = `${state.imageWidth} × ${state.imageHeight} px`;
+
+        // Ajustar recuadro por defecto al centro si excede los límites
+        if (state.box.x + state.box.width > state.imageWidth) {
+          state.box.width = Math.min(1000, state.imageWidth - 100);
+          state.box.x = Math.round((state.imageWidth - state.box.width) / 2);
+        }
+        if (state.box.y > state.imageHeight) {
+          state.box.y = Math.round(state.imageHeight * 0.55);
+        }
+
+        syncInputsFromState();
+        autoFitZoom();
+        renderPreview();
+      };
+      state.image.src = src;
+    }
+
+    bgFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        loadImage(event.target.result, file.name);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // --- CARGA DE EXCEL / CSV CON SHEETJS ---
+    excelFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      excelFileName.textContent = file.name;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convertir a matriz JSON
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (!jsonData || jsonData.length === 0) {
+            alert('El archivo no contiene filas con datos.');
+            return;
+          }
+
+          // Detectar encabezados o columnas
+          const headerRow = jsonData[0];
+          columnSelect.innerHTML = '';
+          
+          let candidateCol = 0;
+          headerRow.forEach((colName, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `Columna ${idx + 1}: ${colName || '(Sin título)'}`;
+            columnSelect.appendChild(opt);
+
+            // Intentar adivinar la columna de nombres
+            const lower = String(colName || '').toLowerCase();
+            if (lower.includes('nombre') || lower.includes('alumno') || lower.includes('estudiante') || lower.includes('apellido')) {
+              candidateCol = idx;
+            }
+          });
+
+          columnSelect.value = candidateCol;
+          columnSelectWrapper.style.display = 'flex';
+
+          // Función para extraer los nombres de la columna seleccionada
+          window._currentRawData = jsonData;
+          extractNamesFromColumn(candidateCol);
+
+        } catch (err) {
+          console.error(err);
+          alert('Hubo un error al leer el archivo Excel. Asegurate de que sea un archivo válido (.xlsx, .xls o .csv).');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    columnSelect.addEventListener('change', () => {
+      extractNamesFromColumn(parseInt(columnSelect.value, 10));
+    });
+
+    function extractNamesFromColumn(colIndex) {
+      if (!window._currentRawData) return;
+      const names = [];
+      // Omitir fila 0 si parece encabezado
+      for (let r = 1; r < window._currentRawData.length; r++) {
+        const row = window._currentRawData[r];
+        if (row && row[colIndex] !== undefined && String(row[colIndex]).trim() !== '') {
+          names.push(String(row[colIndex]).trim());
+        }
+      }
+
+      if (names.length === 0) {
+        alert('No se encontraron nombres en la columna seleccionada.');
+        return;
+      }
+
+      state.students = names;
+      state.currentStudentIndex = 0;
+      updateStudentUI();
+      updateManualListTextarea();
+      renderPreview();
+    }
+
+    // Edición manual de nombres
+    btnToggleManualList.addEventListener('click', () => {
+      if (manualStudentList.style.display === 'none') {
+        manualStudentList.style.display = 'block';
+        btnToggleManualList.textContent = 'Ocultar lista';
+      } else {
+        manualStudentList.style.display = 'none';
+        btnToggleManualList.textContent = 'Ver lista';
+      }
+    });
+
+    manualStudentList.addEventListener('input', () => {
+      const lines = manualStudentList.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+      if (lines.length > 0) {
+        state.students = lines;
+        if (state.currentStudentIndex >= state.students.length) {
+          state.currentStudentIndex = 0;
+        }
+        updateStudentUI();
+        renderPreview();
+      }
+    });
+
+    function updateManualListTextarea() {
+      manualStudentList.value = state.students.join('\n');
+    }
+
+    function updateStudentUI() {
+      studentCountBadge.textContent = `${state.students.length} alumno${state.students.length === 1 ? '' : 's'}`;
+      studentIndexLabel.textContent = `Alumno ${state.currentStudentIndex + 1} de ${state.students.length}:`;
+      currentStudentName.textContent = state.students[state.currentStudentIndex] || '---';
+
+      if (currentStudentBoxLabel) {
+        currentStudentBoxLabel.textContent = `#${state.currentStudentIndex + 1} (${state.students[state.currentStudentIndex] || '---'})`;
+      }
+
+      // Sincronizar el selector desplegable de alumnos
+      if (studentSelectDropdown) {
+        if (studentSelectDropdown.options.length !== state.students.length) {
+          studentSelectDropdown.innerHTML = '';
+          state.students.forEach((name, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `${idx + 1}. ${name}`;
+            studentSelectDropdown.appendChild(opt);
+          });
+        }
+        studentSelectDropdown.value = state.currentStudentIndex;
+      }
+    }
+
+    // Navegación de alumnos cambiando a su posición individual
+    function goToStudent(newIndex) {
+      if (state.students.length === 0) return;
+      state.currentStudentIndex = (newIndex + state.students.length) % state.students.length;
+      updateStudentUI();
+      syncInputsFromState(); // Lee la posición y rotación específica de este alumno
+      renderPreview();
+    }
+
+    btnPrevStudent.addEventListener('click', () => {
+      goToStudent(state.currentStudentIndex - 1);
+    });
+
+    btnNextStudent.addEventListener('click', () => {
+      goToStudent(state.currentStudentIndex + 1);
+    });
+
+    if (studentSelectDropdown) {
+      studentSelectDropdown.addEventListener('change', (e) => {
+        goToStudent(parseInt(e.target.value, 10));
+      });
+    }
+
+    // Copiar posición y rotación actual a todas las hojas
+    if (btnCopyBoxToAll) {
+      btnCopyBoxToAll.addEventListener('click', () => {
+        const current = getCurrentBox();
+        state.defaultBox = { ...current };
+        state.students.forEach((_, idx) => {
+          state.studentBoxes[idx] = { ...current };
+        });
+        alert(`✓ La posición y rotación actual se copiaron a las ${state.students.length} hojas.`);
+        renderPreview();
+      });
+    }
+
+    // --- CONTROLES DE POSICIÓN Y ESTILOS ---
+    function getWeightLabel(w) {
+      const map = {
+        '100': 'Extra fina (100)',
+        '200': 'Fina ligera (200)',
+        '300': 'Fina (300)',
+        '400': 'Normal (400)',
+        '500': 'Media (500)',
+        '600': 'Semi-negrita (600)',
+        '700': 'Negrita (700)',
+        '800': 'Extra-negrita (800)',
+        '900': 'Negra (900)'
+      };
+      return map[String(w)] || `${w}`;
+    }
+
+    function setFontWeight(w) {
+      state.style.fontWeight = String(w);
+      if (fontWeightSelect) fontWeightSelect.value = state.style.fontWeight;
+      if (fontWeightDisplay) fontWeightDisplay.textContent = getWeightLabel(state.style.fontWeight);
+      fontWeightButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.weight === state.style.fontWeight);
+      });
+      renderPreview();
+    }
+
+    if (fontWeightSelect) {
+      fontWeightSelect.addEventListener('change', () => {
+        setFontWeight(fontWeightSelect.value);
+      });
+    }
+
+    fontWeightButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setFontWeight(btn.dataset.weight);
+      });
+    });
+
+    function syncInputsFromState() {
+      inputX.value = state.box.x;
+      inputY.value = state.box.y;
+      inputW.value = state.box.width;
+      inputH.value = state.box.height;
+      
+      const rot = state.box.rotation || 0;
+      rotationSlider.value = rot;
+      inputRotation.value = rot;
+      rotationDisplay.textContent = `${rot}°`;
+
+      fontFamilySelect.value = state.style.fontFamily;
+      fontSizeSlider.value = state.style.fontSize;
+      fontSizeNumber.value = state.style.fontSize;
+      fontSizeDisplay.textContent = `${state.style.fontSize} px`;
+
+      if (fontWeightSelect) {
+        fontWeightSelect.value = state.style.fontWeight || '400';
+        fontWeightDisplay.textContent = getWeightLabel(state.style.fontWeight || '400');
+        fontWeightButtons.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.weight === (state.style.fontWeight || '400'));
+        });
+      }
+
+      rgbR.value = state.style.color.r;
+      rgbG.value = state.style.color.g;
+      rgbB.value = state.style.color.b;
+      colorPicker.value = rgbToHex(state.style.color.r, state.style.color.g, state.style.color.b);
+
+      btnItalic.classList.toggle('active', state.style.isItalic);
+      btnUppercase.classList.toggle('active', state.style.isUppercase);
+      chkAutoFit.checked = state.style.autoFit;
+
+      alignButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.align === state.style.align);
+      });
+
+      updateStudentUI();
+    }
+
+    function syncStateFromInputs() {
+      state.box.x = parseInt(inputX.value, 10) || 0;
+      state.box.y = parseInt(inputY.value, 10) || 0;
+      state.box.width = Math.max(50, parseInt(inputW.value, 10) || 50);
+      state.box.height = Math.max(20, parseInt(inputH.value, 10) || 20);
+
+      state.style.fontSize = parseInt(fontSizeNumber.value, 10) || 64;
+      fontSizeSlider.value = state.style.fontSize;
+      fontSizeDisplay.textContent = `${state.style.fontSize} px`;
+
+      renderPreview();
+    }
+
+    [inputX, inputY, inputW, inputH].forEach(inp => {
+      inp.addEventListener('input', syncStateFromInputs);
+    });
+
+    document.getElementById('btnCenterHoriz').addEventListener('click', () => {
+      state.box.x = Math.round((state.imageWidth - state.box.width) / 2);
+      inputX.value = state.box.x;
+      renderPreview();
+    });
+
+    // Controladores de rotación
+    rotationSlider.addEventListener('input', () => {
+      state.box.rotation = parseInt(rotationSlider.value, 10) || 0;
+      inputRotation.value = state.box.rotation;
+      rotationDisplay.textContent = `${state.box.rotation}°`;
+      renderPreview();
+    });
+
+    inputRotation.addEventListener('input', () => {
+      let val = parseInt(inputRotation.value, 10) || 0;
+      if (val > 180) val = 180;
+      if (val < -180) val = -180;
+      state.box.rotation = val;
+      rotationSlider.value = val;
+      rotationDisplay.textContent = `${val}°`;
+      renderPreview();
+    });
+
+    function setRotation(deg) {
+      state.box.rotation = deg;
+      rotationSlider.value = deg;
+      inputRotation.value = deg;
+      rotationDisplay.textContent = `${deg}°`;
+      renderPreview();
+    }
+
+    document.getElementById('btnRotate0').addEventListener('click', () => setRotation(0));
+    document.getElementById('btnRotate90').addEventListener('click', () => setRotation(90));
+    document.getElementById('btnRotateNeg90').addEventListener('click', () => setRotation(-90));
+    document.getElementById('btnRotate180').addEventListener('click', () => setRotation(180));
+
+    // --- CARGADOR DINÁMICO DE GOOGLE FONTS ---
+    const googleFontInput = document.getElementById('googleFontInput');
+    const btnLoadGoogleFont = document.getElementById('btnLoadGoogleFont');
+    const googleFontStatus = document.getElementById('googleFontStatus');
+
+    async function loadGoogleFont(fontName) {
+      fontName = (fontName || '').trim();
+      if (!fontName) {
+        googleFontStatus.style.color = '#f87171';
+        googleFontStatus.textContent = 'Por favor escribí el nombre de la fuente.';
+        return;
+      }
+
+      googleFontStatus.style.color = '#38bdf8';
+      googleFontStatus.textContent = `Buscando y cargando "${fontName}" de Google Fonts...`;
+
+      try {
+        const fontSlug = fontName.replace(/ /g, '+');
+        const fontId = `gfont-${fontName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+        let link = document.getElementById(fontId);
+        if (!link) {
+          link = document.createElement('link');
+          link.id = fontId;
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${fontSlug}:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,600;1,700&display=swap`;
+          link.onerror = () => {
+            // Fallback para fuentes que no soportan múltiples pesos (ej: caligráficas fijas)
+            link.href = `https://fonts.googleapis.com/css2?family=${fontSlug}&display=swap`;
+          };
+          document.head.appendChild(link);
+        }
+
+        // Esperar a que la hoja de estilo termine de cargarse
+        await new Promise((resolve) => {
+          if (link.sheet) {
+            resolve();
+          } else {
+            link.onload = resolve;
+            link.onerror = resolve;
+            setTimeout(resolve, 800);
+          }
+        });
+
+        // Aplicar la fuente al estado
+        state.style.fontFamily = fontName;
+
+        // Esperar a que el navegador rasterice los glifos
+        if (document.fonts) {
+          const italicPrefix = state.style.isItalic ? 'italic ' : '';
+          const weightVal = state.style.fontWeight || '400';
+          try {
+            await document.fonts.load(`${italicPrefix}${weightVal} 48px "${fontName}"`);
+          } catch(e) {}
+          await document.fonts.ready;
+        }
+
+        // Seleccionar o agregar la opción al menú desplegable
+        let found = false;
+        for (let opt of fontFamilySelect.options) {
+          if (opt.value.toLowerCase() === fontName.toLowerCase()) {
+            fontFamilySelect.value = opt.value;
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          const newOpt = document.createElement('option');
+          newOpt.value = fontName;
+          newOpt.textContent = `⭐ ${fontName} (Google Font)`;
+          fontFamilySelect.insertBefore(newOpt, fontFamilySelect.firstChild);
+          fontFamilySelect.value = fontName;
+        }
+
+        googleFontStatus.style.color = '#34d399';
+        googleFontStatus.textContent = `✓ Fuente "${fontName}" cargada y aplicada.`;
+        
+        // Renderizar inmediatamente y forzar repintados de sincronización
+        renderPreview();
+        setTimeout(renderPreview, 60);
+        setTimeout(renderPreview, 250);
+      } catch (err) {
+        console.error(err);
+        googleFontStatus.style.color = '#f87171';
+        googleFontStatus.textContent = `No se pudo cargar "${fontName}". Verificá que exista en fonts.google.com.`;
+      }
+    }
+
+    btnLoadGoogleFont.addEventListener('click', () => {
+      loadGoogleFont(googleFontInput.value);
+    });
+
+    googleFontInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        loadGoogleFont(googleFontInput.value);
+      }
+    });
+
+    fontFamilySelect.addEventListener('change', async () => {
+      state.style.fontFamily = fontFamilySelect.value;
+      if (document.fonts) {
+        const italicPrefix = state.style.isItalic ? 'italic ' : '';
+        const weightVal = state.style.fontWeight || '400';
+        try {
+          await document.fonts.load(`${italicPrefix}${weightVal} 48px "${state.style.fontFamily}"`);
+        } catch(e) {}
+        await document.fonts.ready;
+      }
+      renderPreview();
+      setTimeout(renderPreview, 60);
+      setTimeout(renderPreview, 200);
+    });
+
+    fontSizeSlider.addEventListener('input', () => {
+      state.style.fontSize = parseInt(fontSizeSlider.value, 10);
+      fontSizeNumber.value = state.style.fontSize;
+      fontSizeDisplay.textContent = `${state.style.fontSize} px`;
+      renderPreview();
+    });
+
+    fontSizeNumber.addEventListener('input', () => {
+      state.style.fontSize = parseInt(fontSizeNumber.value, 10) || 20;
+      fontSizeSlider.value = state.style.fontSize;
+      fontSizeDisplay.textContent = `${state.style.fontSize} px`;
+      renderPreview();
+    });
+
+    // Sincronización de Color RGB & Picker
+    function updateColorFromRGB() {
+      const r = Math.min(255, Math.max(0, parseInt(rgbR.value, 10) || 0));
+      const g = Math.min(255, Math.max(0, parseInt(rgbG.value, 10) || 0));
+      const b = Math.min(255, Math.max(0, parseInt(rgbB.value, 10) || 0));
+      state.style.color = { r, g, b };
+      colorPicker.value = rgbToHex(r, g, b);
+      renderPreview();
+    }
+
+    [rgbR, rgbG, rgbB].forEach(inp => {
+      inp.addEventListener('input', updateColorFromRGB);
+    });
+
+    colorPicker.addEventListener('input', () => {
+      const rgb = hexToRgb(colorPicker.value);
+      if (rgb) {
+        state.style.color = rgb;
+        rgbR.value = rgb.r;
+        rgbG.value = rgb.g;
+        rgbB.value = rgb.b;
+        renderPreview();
+      }
+    });
+
+    function rgbToHex(r, g, b) {
+      return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1);
+    }
+
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
+    // Alineación
+    alignButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        alignButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.style.align = btn.dataset.align;
+        renderPreview();
+      });
+    });
+
+    // Cursiva, Mayúsculas
+    btnItalic.addEventListener('click', () => {
+      state.style.isItalic = !state.style.isItalic;
+      btnItalic.classList.toggle('active', state.style.isItalic);
+      renderPreview();
+    });
+
+    btnUppercase.addEventListener('click', () => {
+      state.style.isUppercase = !state.style.isUppercase;
+      btnUppercase.classList.toggle('active', state.style.isUppercase);
+      renderPreview();
+    });
+
+    chkAutoFit.addEventListener('change', () => {
+      state.style.autoFit = chkAutoFit.checked;
+      renderPreview();
+    });
+
+    // --- ZOOM ---
+    function updateZoom(newScale) {
+      state.scale = Math.max(0.15, Math.min(1.2, newScale));
+      document.getElementById('zoomLevelText').textContent = `${Math.round(state.scale * 100)}%`;
+      renderPreview();
+    }
+
+    document.getElementById('btnZoomIn').addEventListener('click', () => updateZoom(state.scale + 0.05));
+    document.getElementById('btnZoomOut').addEventListener('click', () => updateZoom(state.scale - 0.05));
+    document.getElementById('btnZoomFit').addEventListener('click', autoFitZoom);
+
+    function autoFitZoom() {
+      if (!viewport || !state.imageHeight) return;
+      const availableW = viewport.clientWidth - 80;
+      const availableH = viewport.clientHeight - 80;
+      const scaleW = availableW / state.imageWidth;
+      const scaleH = availableH / state.imageHeight;
+      const bestScale = Math.min(scaleW, scaleH);
+      updateZoom(bestScale);
+    }
+
+    window.addEventListener('resize', () => {
+      // Reajustar ligeramente al cambiar el tamaño de ventana
+      updateOverlayPosition();
+    });
+
+    // --- RENDERIZADO DEL PREVIEW EN CANVAS ---
+    function renderPreview() {
+      if (!state.imageLoaded) return;
+
+      const displayW = Math.round(state.imageWidth * state.scale);
+      const displayH = Math.round(state.imageHeight * state.scale);
+
+      canvas.width = state.imageWidth;
+      canvas.height = state.imageHeight;
+
+      stageWrapper.style.width = `${displayW}px`;
+      stageWrapper.style.height = `${displayH}px`;
+
+      // 1. Dibujar imagen de fondo
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(state.image, 0, 0, state.imageWidth, state.imageHeight);
+
+      // 2. Dibujar texto del alumno actual
+      let studentText = state.students[state.currentStudentIndex] || 'Nombre del Alumno';
+      if (state.style.isUppercase) {
+        studentText = studentText.toUpperCase();
+      }
+
+      drawStudentText(ctx, studentText, state.box, state.style);
+
+      // 3. Actualizar la caja interactiva (overlay)
+      updateOverlayPosition();
+    }
+
+    // Función pura de dibujo de texto tanto para preview como para PDF
+    function drawStudentText(targetCtx, text, box, style) {
+      let fontSize = style.fontSize;
+      const { r, g, b } = style.color;
+      
+      const italicPrefix = style.isItalic ? 'italic ' : '';
+      const weightVal = style.fontWeight || '400';
+      targetCtx.font = `${italicPrefix}${weightVal} ${fontSize}px "${style.fontFamily}", sans-serif`;
+
+      // Auto-Fit: Si el texto es más largo que el ancho del recuadro, reducir dinámicamente
+      if (style.autoFit) {
+        let textWidth = targetCtx.measureText(text).width;
+        const maxWidth = box.width - 20; // margen interno de seguridad
+        if (textWidth > maxWidth && maxWidth > 0) {
+          const ratio = maxWidth / textWidth;
+          fontSize = Math.max(16, Math.floor(fontSize * ratio));
+          targetCtx.font = `${italicPrefix}${weightVal} ${fontSize}px "${style.fontFamily}", sans-serif`;
+        }
+      }
+
+      targetCtx.save();
+      const centerX = box.x + (box.width / 2);
+      const centerY = box.y + (box.height / 2);
+      targetCtx.translate(centerX, centerY);
+
+      const rot = box.rotation || 0;
+      if (rot !== 0) {
+        targetCtx.rotate((rot * Math.PI) / 180);
+      }
+
+      targetCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      targetCtx.textBaseline = 'middle';
+      targetCtx.textAlign = style.align;
+
+      let drawX = 0;
+      if (style.align === 'center') {
+        drawX = 0;
+      } else if (style.align === 'right') {
+        drawX = (box.width / 2) - 10;
+      } else {
+        drawX = -(box.width / 2) + 10;
+      }
+
+      const drawY = 0;
+      targetCtx.fillText(text, drawX, drawY);
+      targetCtx.restore();
+    }
+
+    // Actualiza la posición y tamaño del recuadro interactivo en pantalla
+    function updateOverlayPosition() {
+      const s = state.scale;
+      overlay.style.left = `${Math.round(state.box.x * s)}px`;
+      overlay.style.top = `${Math.round(state.box.y * s)}px`;
+      overlay.style.width = `${Math.round(state.box.width * s)}px`;
+      overlay.style.height = `${Math.round(state.box.height * s)}px`;
+      overlay.style.transform = `rotate(${state.box.rotation || 0}deg)`;
+
+      const rotText = state.box.rotation ? ` | Rot: ${state.box.rotation}°` : '';
+      boxBadge.textContent = `X: ${state.box.x} | Y: ${state.box.y} | ${state.box.width}×${state.box.height}px${rotText}`;
+    }
+
+    // --- INTERACTIVIDAD: ARRASTRE, REDIMENSIÓN Y ROTACIÓN CON MOUSE ---
+    let isDragging = false;
+    let isResizing = false;
+    let isRotating = false;
+    let currentHandle = null;
+    let startX = 0, startY = 0;
+    let initialBox = {};
+    let centerScreenX = 0, centerScreenY = 0;
+
+    overlay.addEventListener('mousedown', (e) => {
+      // Si se hizo clic en el handle superior de rotación
+      if (e.target.id === 'rotateHandle' || e.target.classList.contains('rotate-handle')) {
+        isRotating = true;
+        const rect = overlay.getBoundingClientRect();
+        centerScreenX = rect.left + rect.width / 2;
+        centerScreenY = rect.top + rect.height / 2;
+        rotateHandle.classList.add('rotating');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Si se hizo clic en un handle de redimensión
+      if (e.target.classList.contains('resize-handle')) {
+        isResizing = true;
+        currentHandle = e.target.dataset.handle;
+      } else {
+        isDragging = true;
+      }
+
+      startX = e.clientX;
+      startY = e.clientY;
+      initialBox = { ...state.box };
+
+      overlay.classList.add('dragging');
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging && !isResizing && !isRotating) return;
+
+      if (isRotating) {
+        const rad = Math.atan2(e.clientY - centerScreenY, e.clientX - centerScreenX);
+        let deg = Math.round((rad * 180) / Math.PI) + 90; // +90 porque el handle está arriba
+        while (deg > 180) deg -= 360;
+        while (deg < -180) deg += 360;
+
+        // Snapping magnético a ángulos estándar
+        if (Math.abs(deg) <= 3) deg = 0;
+        else if (Math.abs(deg - 90) <= 3) deg = 90;
+        else if (Math.abs(deg + 90) <= 3) deg = -90;
+        else if (Math.abs(Math.abs(deg) - 180) <= 3) deg = 180;
+        else if (Math.abs(deg - 45) <= 3) deg = 45;
+        else if (Math.abs(deg + 45) <= 3) deg = -45;
+
+        state.box.rotation = deg;
+        syncInputsFromState();
+        renderPreview();
+        return;
+      }
+
+      const deltaX = (e.clientX - startX) / state.scale;
+      const deltaY = (e.clientY - startY) / state.scale;
+
+      if (isDragging) {
+        state.box.x = Math.round(Math.max(0, Math.min(state.imageWidth - initialBox.width, initialBox.x + deltaX)));
+        state.box.y = Math.round(Math.max(0, Math.min(state.imageHeight - initialBox.height, initialBox.y + deltaY)));
+      } else if (isResizing) {
+        let newX = initialBox.x;
+        let newY = initialBox.y;
+        let newW = initialBox.width;
+        let newH = initialBox.height;
+
+        if (currentHandle.includes('r')) {
+          newW = Math.max(60, initialBox.width + deltaX);
+        }
+        if (currentHandle.includes('l')) {
+          const maxLeftDelta = initialBox.width - 60;
+          const appliedDelta = Math.min(maxLeftDelta, deltaX);
+          newX = initialBox.x + appliedDelta;
+          newW = initialBox.width - appliedDelta;
+        }
+        if (currentHandle.includes('b')) {
+          newH = Math.max(30, initialBox.height + deltaY);
+        }
+        if (currentHandle.includes('t')) {
+          const maxTopDelta = initialBox.height - 30;
+          const appliedDelta = Math.min(maxTopDelta, deltaY);
+          newY = initialBox.y + appliedDelta;
+          newH = initialBox.height - appliedDelta;
+        }
+
+        state.box.x = Math.round(newX);
+        state.box.y = Math.round(newY);
+        state.box.width = Math.round(newW);
+        state.box.height = Math.round(newH);
+      }
+
+      syncInputsFromState();
+      renderPreview();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging || isResizing || isRotating) {
+        isDragging = false;
+        isResizing = false;
+        isRotating = false;
+        currentHandle = null;
+        overlay.classList.remove('dragging');
+        rotateHandle.classList.remove('rotating');
+      }
+    });
+
+    // --- GENERACIÓN DE PDFS (GRUPAL E INDIVIDUAL) ---
+    async function waitForFonts() {
+      if (document.fonts) {
+        await document.fonts.ready;
+      }
+    }
+
+    // Modal de progreso
+    function showProgress(title, status, percent) {
+      progressModal.style.display = 'flex';
+      progressTitle.textContent = title;
+      progressStatus.textContent = status;
+      progressBar.style.width = `${percent}%`;
+      progressPercent.textContent = `${Math.round(percent)}%`;
+    }
+
+    function hideProgress() {
+      progressModal.style.display = 'none';
+    }
+
+    // 1. Descargar PDF Grupal (Todas las páginas en un solo archivo)
+    btnDownloadAllPDF.addEventListener('click', async () => {
+      if (state.students.length === 0) {
+        alert('No hay alumnos en la lista.');
+        return;
+      }
+
+      await waitForFonts();
+      showProgress('Generando PDF Grupal', 'Iniciando generación...', 0);
+
+      // Pequeño timeout para permitir que el modal se dibuje en pantalla
+      await new Promise(r => setTimeout(r, 60));
+
+      const { jsPDF } = window.jspdf;
+      
+      // Orientación según las dimensiones de la imagen
+      const isLandscape = state.imageWidth > state.imageHeight;
+      const orientation = isLandscape ? 'l' : 'p';
+      
+      // Creamos el PDF con las dimensiones exactas en puntos/px de la imagen
+      const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'px',
+        format: [state.imageWidth, state.imageHeight],
+        hotfixes: ["px_scaling"]
+      });
+
+      // Canvas fuera de pantalla a resolución 100% nativa
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = state.imageWidth;
+      offCanvas.height = state.imageHeight;
+      const offCtx = offCanvas.getContext('2d');
+
+      const total = state.students.length;
+
+      for (let i = 0; i < total; i++) {
+        const student = state.students[i];
+        const percent = Math.round(((i + 1) / total) * 100);
+        showProgress('Generando PDF Grupal', `Procesando alumno ${i + 1} de ${total}: "${student}"`, percent);
+
+        // Dar un tick al event loop
+        await new Promise(r => setTimeout(r, 10));
+
+        // Limpiar y dibujar fondo
+        offCtx.clearRect(0, 0, state.imageWidth, state.imageHeight);
+        offCtx.drawImage(state.image, 0, 0, state.imageWidth, state.imageHeight);
+
+        // Dibujar nombre con la posición específica de este alumno
+        let text = student;
+        if (state.style.isUppercase) text = text.toUpperCase();
+        const studentBox = getStudentBox(i);
+        drawStudentText(offCtx, text, studentBox, state.style);
+
+        // Convertir a JPEG alta calidad (92% de calidad reduce el peso drásticamente sin pérdida visual)
+        const pageImgData = offCanvas.toDataURL('image/jpeg', 0.92);
+
+        if (i > 0) {
+          pdf.addPage([state.imageWidth, state.imageHeight], orientation);
+        }
+
+        pdf.addImage(pageImgData, 'JPEG', 0, 0, state.imageWidth, state.imageHeight);
+      }
+
+      showProgress('Finalizando PDF', 'Guardando archivo en el equipo...', 100);
+      await new Promise(r => setTimeout(r, 100));
+
+      pdf.save('Documentos_Alumnos_Todos.pdf');
+      hideProgress();
+    });
+
+    // 2. Descargar PDFs Individuales empaquetados en un archivo ZIP
+    btnDownloadZip.addEventListener('click', async () => {
+      if (state.students.length === 0) {
+        alert('No hay alumnos en la lista.');
+        return;
+      }
+
+      await waitForFonts();
+      showProgress('Generando PDFs Individuales', 'Iniciando compresión ZIP...', 0);
+      await new Promise(r => setTimeout(r, 60));
+
+      const { jsPDF } = window.jspdf;
+      const zip = new JSZip();
+
+      const isLandscape = state.imageWidth > state.imageHeight;
+      const orientation = isLandscape ? 'l' : 'p';
+
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = state.imageWidth;
+      offCanvas.height = state.imageHeight;
+      const offCtx = offCanvas.getContext('2d');
+
+      const total = state.students.length;
+
+      for (let i = 0; i < total; i++) {
+        const student = state.students[i];
+        const percent = Math.round(((i + 1) / total) * 100);
+        showProgress('Generando Archivos Individuales', `Creando PDF ${i + 1} de ${total}: "${student}"`, percent);
+        await new Promise(r => setTimeout(r, 10));
+
+        // Dibujar
+        offCtx.clearRect(0, 0, state.imageWidth, state.imageHeight);
+        offCtx.drawImage(state.image, 0, 0, state.imageWidth, state.imageHeight);
+
+        // Dibujar con la posición específica de este alumno
+        let text = student;
+        if (state.style.isUppercase) text = text.toUpperCase();
+        const studentBox = getStudentBox(i);
+        drawStudentText(offCtx, text, studentBox, state.style);
+
+        const pageImgData = offCanvas.toDataURL('image/jpeg', 0.92);
+
+        // Crear PDF individual
+        const singlePdf = new jsPDF({
+          orientation: orientation,
+          unit: 'px',
+          format: [state.imageWidth, state.imageHeight],
+          hotfixes: ["px_scaling"]
+        });
+        singlePdf.addImage(pageImgData, 'JPEG', 0, 0, state.imageWidth, state.imageHeight);
+
+        // Sanitizar nombre de archivo
+        const safeName = student.replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const filename = `${String(i + 1).padStart(2, '0')}_${safeName}.pdf`;
+
+        // Agregar al zip como blob
+        const pdfBlob = singlePdf.output('blob');
+        zip.file(filename, pdfBlob);
+      }
+
+      showProgress('Comprimiendo ZIP', 'Generando paquete descargable...', 100);
+      await new Promise(r => setTimeout(r, 50));
+
+      const zipContent = await zip.generateAsync({ type: 'blob' });
+      saveAs(zipContent, 'Documentos_Alumnos_Individuales.zip');
+      hideProgress();
+    });
+
+    // 3. Descargar solo el PDF del alumno actual en pantalla
+    btnDownloadCurrentPDF.addEventListener('click', async () => {
+      const student = state.students[state.currentStudentIndex] || 'Alumno';
+      await waitForFonts();
+
+      const { jsPDF } = window.jspdf;
+      const isLandscape = state.imageWidth > state.imageHeight;
+      const orientation = isLandscape ? 'l' : 'p';
+
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = state.imageWidth;
+      offCanvas.height = state.imageHeight;
+      const offCtx = offCanvas.getContext('2d');
+
+      offCtx.drawImage(state.image, 0, 0, state.imageWidth, state.imageHeight);
+      let text = student;
+      if (state.style.isUppercase) text = text.toUpperCase();
+      drawStudentText(offCtx, text, state.box, state.style);
+
+      const pageImgData = offCanvas.toDataURL('image/jpeg', 0.95);
+
+      const singlePdf = new jsPDF({
+        orientation: orientation,
+        unit: 'px',
+        format: [state.imageWidth, state.imageHeight],
+        hotfixes: ["px_scaling"]
+      });
+      singlePdf.addImage(pageImgData, 'JPEG', 0, 0, state.imageWidth, state.imageHeight);
+
+      const safeName = student.replace(/[/\\?%*:|"<>]/g, '_').trim();
+      singlePdf.save(`${safeName}.pdf`);
+    });
+
+    // --- GUÍA DE AYUDA RÁPIDA ---
+    function showHelp() {
+      alert(
+        "GUÍA RÁPIDA DE USO:\n\n" +
+        "1. Imagen de Fondo: Por defecto carga 1.png. Podés hacer clic en 'Cambiar por otra imagen' para usar 2.png o cualquier otra.\n\n" +
+        "2. Alumnos: Podés arrastrar o cargar tu archivo Excel (.xlsx / .csv) y elegir la columna con los nombres, o usar la lista precargada.\n\n" +
+        "3. Recuadro: Arrastralo con el mouse directamente sobre la imagen y estiralo desde los bordes. También tenés campos numéricos de X, Y, Ancho y Alto, y el botón 'Centrar X'.\n\n" +
+        "4. Fuente y Color: Elegí entre fuentes caligráficas y formales. Ajustá el tamaño y configurá el color con el selector o los números RGB exactos (0 a 255).\n\n" +
+        "5. Descarga: Podés descargar el PDF grupal completo (todas las hojas en 1 archivo) o el paquete .ZIP con los PDFs individuales de cada alumno."
+      );
+    }
+
+    function setupEventListeners() {
+      // Atajos de teclado: flechas izquierda/derecha para navegar alumnos si no está en un input
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+        if (e.key === 'ArrowLeft') btnPrevStudent.click();
+        if (e.key === 'ArrowRight') btnNextStudent.click();
+      });
+    }
+  </script>
+</body>
+</html>
